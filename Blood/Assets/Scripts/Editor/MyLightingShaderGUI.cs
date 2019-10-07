@@ -138,6 +138,7 @@ public class MyLightingShaderGUI : ShaderGUI {
 		if (shouldShowAlphaCutoff) {
 			DoAlphaCutoff();
 		}
+		DoDecal();
 		DoMetallic();
 		DoSmoothness();
 		DoNormals();
@@ -164,6 +165,18 @@ public class MyLightingShaderGUI : ShaderGUI {
 		);
 		if (EditorGUI.EndChangeCheck() && tex != map.textureValue) {
 			SetKeyword("_NORMAL_MAP", map.textureValue);
+		}
+	}
+
+	void DoDecal () {
+		MaterialProperty map = FindProperty("_DecalTex");
+		Texture tex = map.textureValue;
+		EditorGUI.BeginChangeCheck();
+		editor.TexturePropertySingleLine(
+			MakeLabel(map, "Decal (RGB)"), map 
+		);
+		if (EditorGUI.EndChangeCheck() && tex != map.textureValue) {
+			SetKeyword("_DECAL_MAP", map.textureValue);
 		}
 	}
 
