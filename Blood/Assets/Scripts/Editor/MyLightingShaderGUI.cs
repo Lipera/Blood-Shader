@@ -173,7 +173,8 @@ public class MyLightingShaderGUI : ShaderGUI {
 		Texture tex = map.textureValue;
 		EditorGUI.BeginChangeCheck();
 		editor.TexturePropertySingleLine(
-			MakeLabel(map, "Decal (RGB)"), map 
+			MakeLabel(map, "Decal (RGB)"), map, 
+			tex? FindProperty("_DecalTint") : null
 		);
 		if (EditorGUI.EndChangeCheck() && tex != map.textureValue) {
 			SetKeyword("_DECAL_MAP", map.textureValue);

@@ -8,6 +8,7 @@ float4 _Tint;
 sampler2D _MainTex, _DetailTex, _DetailMask;
 float4 _MainTex_ST, _DetailTex_ST;
 
+float4 _DecalTint;
 sampler2D _DecalTex;
 
 sampler2D _NormalMap, _DetailNormalMap;
@@ -79,8 +80,8 @@ float GetAlpha (Interpolators i) {
 }
 
 float3 GetDecal (Interpolators i) {
-		#if defined (_DECAL_MAP)
-		return tex2D(_DecalTex, i.uv.xy).rgb;
+	#if defined (_DECAL_MAP)
+		return tex2D(_DecalTex, i.uv.xy).rgb * _DecalTint.rgb;
 	#else
 		return 1;
 	#endif
@@ -323,6 +324,7 @@ FragmentOutput MyFragmentProgram (Interpolators i) {
 		CreateLight(i), CreateIndirectLight(i, viewDir)
 	);
 	color.rgb += GetEmission(i);
+	color.rgb *= GetDecal(i);
 	#if defined(_RENDERING_FADE) || defined(_RENDERING_TRANSPARENT)
 		color.a = alpha;
 	#endif
