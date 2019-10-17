@@ -6,18 +6,15 @@ Shader "Decal/DecalShader"
 	{
 		_Color ("Color", Color) = (1,1,1,1)
         _MainTex ("Diffuse", 2D) = "white" {}
-        _Glossiness ("Smoothness", Range(0,1)) = 0.5
-        _Metallic ("Metallic", Range(0,1)) = 0.0
-        [HDR]_Emission ("Emission", color) = (0,0,0)
 
         [Header(Dissolve)]
         _DissolveTex ("Dissolve Texture (R)", 2D) = "black" {}
         _DissolveAmount ("Dissolve Amount", Range(0, 1)) = 0.5
 
-        [Header(Glow)]
-        [HDR]_GlowColor ("Color", Color) = (1,1,1,1)
-        _GlowRange ("Range", Range(0, 0.3)) = 0.1
-        _GlowFalloff ("Falloff", Range(0.001, 0.3)) = 0.1
+        [Header(Edges)]
+        [HDR]_EdgeColor ("Color", Color) = (1,1,1,1)
+        _EdgeRange ("Range", Range(0, 0.3)) = 0.1
+        _EdgeFalloff ("Falloff", Range(0.001, 0.3)) = 0.1
 	}
 	SubShader
 	{
@@ -77,13 +74,9 @@ Shader "Decal/DecalShader"
 			sampler2D _DissolveTex;
 			float _DissolveAmount;
 
-			half _Glossiness;
-			half _Metallic;
-			half3 _Emission;
-
-			float3 _GlowColor;
-			float _GlowRange;
-			float _GlowFalloff;
+			float3 _EdgeColor;
+			float _EdgeRange;
+			float _EdgeFalloff;
 
 			//void frag(
 			//	v2f i,
@@ -92,7 +85,7 @@ Shader "Decal/DecalShader"
 			//	out half4 outNormal : COLOR2,			// RT2: normal (rgb), --unused-- (a)
 			//	out half4 outEmission : COLOR3			// RT3: emission (rgb), --unused-- (a)
 			//)
-			void frag(v2f i, out half4 outDiffuse : SV_TARGET, out half4 outEmission : COLOR3)
+			fixed4 frag(v2f i) : SV_TARGET
 			{
 				//==== Dissolve effect ====//
 				float dissolve = tex2D(_DissolveTex, i.dissolveUV).r;
@@ -100,9 +93,9 @@ Shader "Decal/DecalShader"
 				float isVisible = dissolve - _DissolveAmount;
 				clip(isVisible);
 
-				//Glowing edges
-				float isGlowing = smoothstep(_GlowRange + _GlowFalloff, _GlowRange, isVisible);
-				float3 glow = float4(_GlowColor * isGlowing, 1);
+				//Edges
+				float isEdge = smoothstep(_EdgeRange + _EdgeFalloff, _EdgeRange, isVisible);
+				float4 edge = isEdge == 0 ? 1 : float4(_EdgeColor * isEdge, 1); //if condition so that section that is not on the edge does not blend with edge color
 
 				//==== Decal effect ====//
 				i.ray = i.ray * (_ProjectionParams.z / i.ray.z);
@@ -123,9 +116,8 @@ Shader "Decal/DecalShader"
 				fixed3 wnormal = normal.rgb * 2.0 - 1.0;
 				clip (dot(wnormal, i.orientation) - 0.3);
 
-				fixed4 col = tex2D (_MainTex, i.uv);
-				outDiffuse = col;
-				outEmission = half4(_Emission + glow, 1);
+				fixed4 col = tex2D (_MainTex, i.uv) * edge;
+				return col;
 			}
 			ENDCG
 		}		

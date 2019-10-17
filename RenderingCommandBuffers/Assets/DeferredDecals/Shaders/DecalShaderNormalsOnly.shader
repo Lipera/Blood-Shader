@@ -12,6 +12,10 @@ Shader "Decal/DecalShader Normals"
 	{
 		_MainTex ("Diffuse", 2D) = "white" {}
 		_BumpMap ("Normals", 2D) = "bump" {}
+
+		[Header(Dissolve)]
+        _DissolveTex ("Dissolve Texture (R)", 2D) = "black" {}
+        _DissolveAmount ("Dissolve Amount", Range(0, 1)) = 0.5
 	}
 	SubShader
 	{
@@ -29,24 +33,34 @@ Shader "Decal/DecalShader Normals"
 			
 			#include "UnityCG.cginc"
 
+			struct appdata
+			{
+				float3 vertex : POSITION;
+				half2 uv : TEXCOORD0;
+			};
+
 			struct v2f
 			{
 				float4 pos : SV_POSITION;
 				half2 uv : TEXCOORD0;
 				float4 screenUV : TEXCOORD1;
-				float3 ray : TEXCOORD2;
-				half3 orientation : TEXCOORD3;
-				half3 orientationX : TEXCOORD4;
-				half3 orientationZ : TEXCOORD5;
+				half2 dissolveUV : TEXCOORD2;
+				float3 ray : TEXCOORD3;
+				half3 orientation : TEXCOORD4;
+				half3 orientationX : TEXCOORD5;
+				half3 orientationZ : TEXCOORD6;
 			};
 
-			v2f vert (float3 v : POSITION)
+			float4 _DissolveTex_ST;
+
+			v2f vert (appdata v)
 			{
 				v2f o;
-				o.pos = UnityObjectToClipPos (float4(v,1));
-				o.uv = v.xz+0.5;
+				o.pos = UnityObjectToClipPos (float4(v.vertex,1));
+				o.uv = v.vertex.xz+0.5;
 				o.screenUV = ComputeScreenPos (o.pos);
-				o.ray = mul (UNITY_MATRIX_MV, float4(v,1)).xyz * float3(-1,-1,1);
+				o.dissolveUV = TRANSFORM_TEX(v.uv, _DissolveTex);
+				o.ray = mul (UNITY_MATRIX_MV, float4(v.vertex,1)).xyz * float3(-1,-1,1);
 				o.orientation = mul ((float3x3)unity_ObjectToWorld, float3(0,1,0));
 				o.orientationX = mul ((float3x3)unity_ObjectToWorld, float3(1,0,0));
 				o.orientationZ = mul ((float3x3)unity_ObjectToWorld, float3(0,0,1));
@@ -62,6 +76,9 @@ Shader "Decal/DecalShader Normals"
 			sampler2D_float _CameraDepthTexture;
 			sampler2D _NormalsCopy;
 
+			sampler2D _DissolveTex;
+			float _DissolveAmount;
+
 			//void frag(
 			//	v2f i,
 			//	out half4 outDiffuse : COLOR0,			// RT0: diffuse color (rgb), --unused-- (a)
@@ -71,6 +88,12 @@ Shader "Decal/DecalShader Normals"
 			//)
 			fixed4 frag(v2f i) : SV_Target
 			{
+				//==== Dissolve effect ====//
+				float dissolve = tex2D(_DissolveTex, i.dissolveUV).r;
+				dissolve = dissolve * 0.999; //make whites be a bit less than 1 so it can be cliped as well
+				float isVisible = dissolve - _DissolveAmount;
+				clip(isVisible);
+
 				i.ray = i.ray * (_ProjectionParams.z / i.ray.z);
 				float2 uv = i.screenUV.xy / i.screenUV.w;
 				// read depth and reconstruct world position
