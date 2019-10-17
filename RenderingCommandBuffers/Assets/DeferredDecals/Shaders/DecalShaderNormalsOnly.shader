@@ -33,34 +33,26 @@ Shader "Decal/DecalShader Normals"
 			
 			#include "UnityCG.cginc"
 
-			struct appdata
-			{
-				float3 vertex : POSITION;
-				half2 uv : TEXCOORD0;
-			};
-
 			struct v2f
 			{
 				float4 pos : SV_POSITION;
 				half2 uv : TEXCOORD0;
 				float4 screenUV : TEXCOORD1;
-				half2 dissolveUV : TEXCOORD2;
-				float3 ray : TEXCOORD3;
-				half3 orientation : TEXCOORD4;
-				half3 orientationX : TEXCOORD5;
-				half3 orientationZ : TEXCOORD6;
+				float3 ray : TEXCOORD2;
+				half3 orientation : TEXCOORD3;
+				half3 orientationX : TEXCOORD4;
+				half3 orientationZ : TEXCOORD5;
 			};
 
 			float4 _DissolveTex_ST;
 
-			v2f vert (appdata v)
+			v2f vert (float3 v : POSITION)
 			{
 				v2f o;
-				o.pos = UnityObjectToClipPos (float4(v.vertex,1));
-				o.uv = v.vertex.xz+0.5;
+				o.pos = UnityObjectToClipPos (float4(v,1));
+				o.uv = v.xz+0.5;
 				o.screenUV = ComputeScreenPos (o.pos);
-				o.dissolveUV = TRANSFORM_TEX(v.uv, _DissolveTex);
-				o.ray = mul (UNITY_MATRIX_MV, float4(v.vertex,1)).xyz * float3(-1,-1,1);
+				o.ray = mul (UNITY_MATRIX_MV, float4(v,1)).xyz * float3(-1,-1,1);
 				o.orientation = mul ((float3x3)unity_ObjectToWorld, float3(0,1,0));
 				o.orientationX = mul ((float3x3)unity_ObjectToWorld, float3(1,0,0));
 				o.orientationZ = mul ((float3x3)unity_ObjectToWorld, float3(0,0,1));
@@ -88,12 +80,7 @@ Shader "Decal/DecalShader Normals"
 			//)
 			fixed4 frag(v2f i) : SV_Target
 			{
-				//==== Dissolve effect ====//
-				float dissolve = tex2D(_DissolveTex, i.dissolveUV).r;
-				dissolve = dissolve * 0.999; //make whites be a bit less than 1 so it can be cliped as well
-				float isVisible = dissolve - _DissolveAmount;
-				clip(isVisible);
-
+				//==== Decal effect ====//
 				i.ray = i.ray * (_ProjectionParams.z / i.ray.z);
 				float2 uv = i.screenUV.xy / i.screenUV.w;
 				// read depth and reconstruct world position
@@ -119,6 +106,13 @@ Shader "Decal/DecalShader Normals"
 				//nor = fixed3(0,0,1);
 				half3x3 norMat = half3x3(i.orientationX, i.orientationZ, i.orientation);
 				nor = mul (nor, norMat);
+
+				//==== Dissolve effect ====//
+				float dissolve = tex2D(_DissolveTex, i.uv).r;
+				dissolve = dissolve * 0.999; //make whites be a bit less than 1 so it can be cliped as well
+				float isVisible = dissolve - _DissolveAmount;
+				clip(isVisible);
+
 				return fixed4(nor*0.5+0.5,1);
 			}
 			ENDCG

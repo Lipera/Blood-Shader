@@ -32,12 +32,6 @@ Shader "Decal/DecalShader"
 			
 			#include "UnityCG.cginc"
 
-			struct appdata
-			{
-				float3 vertex : POSITION;
-				half2 uv : TEXCOORD0;
-			};
-
 			struct v2f
 			{
 				float4 pos : SV_POSITION;
@@ -45,20 +39,18 @@ Shader "Decal/DecalShader"
 				float4 screenUV : TEXCOORD1;
 				float3 ray : TEXCOORD2;
 				half3 orientation : TEXCOORD3;
-				half2 dissolveUV : TEXCOORD4;
 			};
 
 			float4 _DissolveTex_ST;
 
-			v2f vert (appdata v)
+			v2f vert (float3 v : POSITION)
 			{
 				v2f o;
-				o.pos = UnityObjectToClipPos (float4(v.vertex,1));
-				o.uv = v.vertex.xz+0.5;
+				o.pos = UnityObjectToClipPos (float4(v,1));
+				o.uv = v.xz+0.5;
 				o.screenUV = ComputeScreenPos (o.pos);
-				o.ray = mul (UNITY_MATRIX_MV, float4(v.vertex,1)).xyz * float3(-1,-1,1);
+				o.ray = mul (UNITY_MATRIX_MV, float4(v,1)).xyz * float3(-1,-1,1);
 				o.orientation = mul ((float3x3)unity_ObjectToWorld, float3(0,1,0));
-				o.dissolveUV = TRANSFORM_TEX(v.uv, _DissolveTex);
 				return o;
 			}
 
@@ -87,16 +79,6 @@ Shader "Decal/DecalShader"
 			//)
 			fixed4 frag(v2f i) : SV_TARGET
 			{
-				//==== Dissolve effect ====//
-				float dissolve = tex2D(_DissolveTex, i.dissolveUV).r;
-				dissolve = dissolve * 0.999; //make whites be a bit less than 1 so it can be cliped as well
-				float isVisible = dissolve - _DissolveAmount;
-				clip(isVisible);
-
-				//Edges
-				float isEdge = smoothstep(_EdgeRange + _EdgeFalloff, _EdgeRange, isVisible);
-				float4 edge = isEdge == 0 ? 1 : float4(_EdgeColor * isEdge, 1); //if condition so that section that is not on the edge does not blend with edge color
-
 				//==== Decal effect ====//
 				i.ray = i.ray * (_ProjectionParams.z / i.ray.z);
 				float2 uv = i.screenUV.xy / i.screenUV.w;
@@ -115,6 +97,17 @@ Shader "Decal/DecalShader"
 				half3 normal = tex2D(_NormalsCopy, uv).rgb;
 				fixed3 wnormal = normal.rgb * 2.0 - 1.0;
 				clip (dot(wnormal, i.orientation) - 0.3);
+
+				//==== Dissolve effect ====//
+				float dissolve = tex2D(_DissolveTex, i.uv).r;
+				dissolve = dissolve * 0.999; //make whites be a bit less than 1 so it can be cliped as well
+				float isVisible = dissolve - _DissolveAmount;
+				clip(isVisible);
+
+				//Edges
+				float isEdge = smoothstep(_EdgeRange + _EdgeFalloff, _EdgeRange, isVisible);
+				float4 edge = isEdge == 0 ? 1 : float4(_EdgeColor * isEdge, 1); //if condition so that section that is not on the edge does not blend with edge color
+
 
 				fixed4 col = tex2D (_MainTex, i.uv) * edge;
 				return col;

@@ -12,6 +12,15 @@ Shader "Decal/DecalShader Diffuse+Normals"
 	{
 		_MainTex ("Diffuse", 2D) = "white" {}
 		_BumpMap ("Normals", 2D) = "bump" {}
+
+		[Header(Dissolve)]
+        _DissolveTex ("Dissolve Texture (R)", 2D) = "black" {}
+        _DissolveAmount ("Dissolve Amount", Range(0, 1)) = 0.5
+
+		[Header(Edges)]
+        [HDR]_EdgeColor ("Color", Color) = (1,1,1,1)
+        _EdgeRange ("Range", Range(0, 0.3)) = 0.1
+        _EdgeFalloff ("Falloff", Range(0.001, 0.3)) = 0.1
 	}
 	SubShader
 	{
@@ -62,8 +71,16 @@ Shader "Decal/DecalShader Diffuse+Normals"
 			sampler2D_float _CameraDepthTexture;
 			sampler2D _NormalsCopy;
 
+			sampler2D _DissolveTex;
+			float _DissolveAmount;
+
+			float3 _EdgeColor;
+			float _EdgeRange;
+			float _EdgeFalloff;
+
 			void frag(v2f i, out half4 outDiffuse : COLOR0, out half4 outNormal : COLOR1)
 			{
+				//==== Decal effect ====//
 				i.ray = i.ray * (_ProjectionParams.z / i.ray.z);
 				float2 uv = i.screenUV.xy / i.screenUV.w;
 				// read depth and reconstruct world position
@@ -82,7 +99,18 @@ Shader "Decal/DecalShader Diffuse+Normals"
 				fixed3 wnormal = normal.rgb * 2.0 - 1.0;
 				clip (dot(wnormal, i.orientation) - 0.3);
 
-				fixed4 col = tex2D (_MainTex, i.uv);
+				//==== Dissolve effect ====//
+				float dissolve = tex2D(_DissolveTex, i.uv).r;
+				dissolve = dissolve * 0.999; //make whites be a bit less than 1 so it can be cliped as well
+				float isVisible = dissolve - _DissolveAmount;
+				clip(isVisible);
+
+				//Edges
+				float isEdge = smoothstep(_EdgeRange + _EdgeFalloff, _EdgeRange, isVisible);
+				float4 edge = isEdge == 0 ? 1 : float4(_EdgeColor * isEdge, 1); //if condition so that section that is not on the edge does not blend with edge color
+
+
+				fixed4 col = tex2D (_MainTex, i.uv) * edge;
 				clip (col.a - 0.2);
 				outDiffuse = col;
 
